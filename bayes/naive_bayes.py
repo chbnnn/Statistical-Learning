@@ -2,7 +2,7 @@
 """
 Created on 19-4-10 下午8:18
 
-@author: chinbing <x62881999@gmail.com> (原创声明)
+@author: chinbing <x62881999@gmail.com> 
 """
 import numpy as np
 from sklearn.metrics import average_precision_score, recall_score, f1_score
@@ -193,7 +193,6 @@ if __name__ == '__main__':
 					break
 				naive_bayes.predict(sentence)
 
-		print('原创声明- -')
 		input('press any key to exit...')
 
 
