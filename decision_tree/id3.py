@@ -6,14 +6,13 @@ Created on 19-5-25 下午4:03
 """
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import accuracy_score
-
+from plot_tree import *
 
 class ID3:
 	def __init__(self):
 		self.labels = []
-		self.label_num = 0
-		self.used_labels = []
 		self.entropy = -1
 		self.tree = None
 
@@ -35,6 +34,7 @@ class ID3:
 		unique_indexs = [data[:, column] == value for value in unique_values]
 		entropys = [sum(idxs) / len(data) * self.calculate_entropy(data[idxs]) for idxs in unique_indexs]
 		conditional_entropy = sum(entropys)
+		# print(self.labels[column], 'cond entropy is: ', conditional_entropy)
 		return conditional_entropy
 
 	# @staticmethod
@@ -43,12 +43,11 @@ class ID3:
 	# 	data_reduced = np.delete(data_origin[idx_vec, :], axis, axis=1)
 	# 	return data_reduced
 
-	def find_best_feature(self, data):
-		feature_list = set(range(self.label_num)) - set(self.used_labels)
+	def find_best_feature(self, data, labels):
 		base_entropy = self.calculate_entropy(data)
 		max_info_gain = 0.0
 		best_feature_index = None
-		for i in feature_list:
+		for i in labels[:-1]:
 			# feature_value_list = data[:, i]
 			# unique_feature_values = set(feature_value_list)
 			# left_entropy = 0.0
@@ -59,65 +58,61 @@ class ID3:
 			# 	left_entropy += prob_di * info_di
 			left_entropy = self.calculate_conditional_entropy(data, i)
 			info_gain = base_entropy - left_entropy
-			if info_gain > max_info_gain:
+			# print(self.labels[i], ' info gain: ', info_gain)
+			if info_gain >= max_info_gain:  # >= rather than >
 				max_info_gain = info_gain
 				best_feature_index = i
-
 		return best_feature_index
 
 	@staticmethod
 	def find_majority_class(class_list):
 		label_unique, counts = np.unique(class_list, return_counts=True)
-		majority_class = max(label_unique, key=counts)
+		label_count = dict(zip(label_unique, counts))
+		majority_class = max(label_count, key=label_count.get)
 		return majority_class
 
 	def build_decision_tree(self, data, labels):
 		class_list = data[:, -1]
-
 		if len(set(class_list)) == 1:
 			return class_list[0]
 		# elif data.shape[1] == 1:
-		elif len(self.used_labels) == len(self.labels):
+		elif len(labels) == 1:
 			return self.find_majority_class(class_list)
 
-		best_feature_index = self.find_best_feature(data)
-		best_feature_label = labels[best_feature_index]
+		best_feature_index = self.find_best_feature(data, labels)
+		best_feature_label = self.labels[best_feature_index]
 
+		labels.remove(best_feature_index)
 		tree = {best_feature_label: {}}
 
 		feature_value_list = data[:, best_feature_index]
-		unique_feature_value = set(feature_value_list)
+		unique_feature_value = np.unique(feature_value_list)
 		for value in unique_feature_value:
-			reduced_labels = np.delete(labels, best_feature_index, 0)
-			self.used_labels.append(best_feature_index)
-			idxs = data[:, best_feature_index] == value
-			splited_data = data[idxs]
-			tree[best_feature_label][value] = self.build_decision_tree(splited_data, reduced_labels)
+			idxs = feature_value_list == value
+			# if sum(idxs) == 0:
+			# 	continue
+			splited_data = data[idxs, :]
+			tree[best_feature_label][value] = self.build_decision_tree(splited_data, labels)
 		self.tree = tree
 		return tree
 
 	def fit(self, x, y):
 		self.labels = y
-		self.label_num = len(y) - 1
 		self.entropy = self.calculate_entropy(data=x)
-		return self.build_decision_tree(data=x, labels=y)
+		return self.build_decision_tree(data=x, labels=list(range(len(y))))
 
-	def classify(self, test_vec, feature_labels=[], tree=None):
+	def classify(self, test_vec, tree=None):
 		if tree is None:
 			tree = self.tree
-		if not feature_labels:
-			feature_labels = self.labels
-		if isinstance(feature_labels, np.ndarray):
-			feature_labels = feature_labels.tolist()
 
 		feature_root = list(tree.keys())[0]
 		children = tree[feature_root]
-		feature_index = feature_labels.index(feature_root)
+		feature_index = self.labels.index(feature_root)
 
 		for key in children.keys():
 			if test_vec[feature_index] == key:
 				if isinstance(children[key], dict):
-					class_label = self.classify(test_vec, feature_labels, tree=children[key])
+					class_label = self.classify(test_vec, tree=children[key])
 				else:
 					class_label = children[key]
 		return class_label
@@ -311,15 +306,6 @@ def classify(input_tree, feature_labels, test_vec):
 	return class_label
 
 
-if __name__ == '__main__':
-	data, labels = createDataSet()
-	id3 = ID3()
-	tree = id3.fit(data, labels)
-	print(tree)
-	res = id3.evaluate([['青年', '否', '否', '一般']], ['否'])
-	print(res)
-
-
 
 """
 	** *延伸拓展 ** *
@@ -346,3 +332,18 @@ if __name__ == '__main__':
 #
 # fr = open(filename)
 # return pickle.load(fr)
+
+
+if __name__ == '__main__':
+	# data = pd.read_csv('bank.csv').iloc[:1050]
+	# bank = data[['marital', 'loan', 'education', 'housing']]
+	# label = ['marital', 'loan', 'education', 'housing']
+
+	data, labels = createDataSet()
+	id3 = ID3()
+	# tree = id3.fit(bank.iloc[:1000].values, label)
+	tree = id3.fit(data, labels)
+	print(tree)
+	# acc = id3.evaluate(bank.iloc[-50:, :-1].values, bank.iloc[-50:, -1].values)
+	# print('Accuracy: ', acc)
+	create_plot(tree)
